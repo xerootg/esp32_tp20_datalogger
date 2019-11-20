@@ -1,5 +1,7 @@
 #ifndef __CAN_FUNCTIONS_H__
 #define __CAN_FUNCTIONS_H__
+#include <stdint.h>
+#include <stdio.h>
 
 typedef struct
 {

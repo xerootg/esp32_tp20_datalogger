@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 #ifndef VWTP_H
 #define VWTP_H
 

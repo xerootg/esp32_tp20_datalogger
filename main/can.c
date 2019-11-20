@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "driver/gpio.h"
 #include "driver/can.h"
 #include "can.h"

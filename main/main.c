@@ -5,7 +5,7 @@
 #include "can.h"
 #include "vwtp.h"
 
-void app_main(void)
+void app_main()
 {
     //setup RTC
     //setup SD card
