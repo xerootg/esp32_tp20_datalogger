@@ -57,11 +57,11 @@ void CAN_Close()
     }
 }
 
-// We are assuming this is a standard ID, not an extended ID.
+// ESP32 does not care about extended frame messages.
 uint8_t CAN_ReceiveMsg(CanMessage_t * msg){
     can_message_t _msg;
 
-    esp_err_t err = can_receive(_msg, NULL);
+    esp_err_t err = can_receive(&_msg, portMAX_DELAY);
 
     if(err == ESP_OK){
         msg->id = _msg.identifier;
@@ -80,7 +80,7 @@ uint8_t CAN_SendMsg(CanMessage_t * msg){
     _msg.data_length_code = msg->len;
     memmove(_msg.data, msg->payload, 8);
 
-    esp_err_t err = can_transmit(_msg, NULL);
+    esp_err_t err = can_transmit(&_msg, portMAX_DELAY);
     if(err == ESP_OK){
         err = can_clear_transmit_queue();
         if(err == ESP_OK){
@@ -88,6 +88,17 @@ uint8_t CAN_SendMsg(CanMessage_t * msg){
         }
     }
     return 1;
+}
+
+// Return the number of pending received frames
+uint8_t CAN_MessagePending(){
+    can_status_info_t status;
+    esp_err_t err = can_get_status_info(&status);
+    if(err){
+        printf("Failed to get CAN status");
+        return 1;
+    }
+    return status.msgs_to_tx;
 }
 
 //sets inbox filter to only accept "id"
