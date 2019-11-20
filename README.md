@@ -1,11 +1,6 @@
-ESP-IDF template app
+ESP32 based VW TP2.0 Datalogger
 ====================
 
-This is a template application to be used with [Espressif IoT Development Framework](https://github.com/espressif/esp-idf).
+This is a port of [JacekGreniger's stm32-vagcanlogger](https://github.com/JacekGreniger/stm32-vagcanlogger) to the esp32. I have largely stripped the feature set down to only support TP2.0, as I have no use for K-Line diagnostics.
 
-Please check [ESP-IDF docs](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/index.html) for getting started instructions.
-
-*Code in this repository is in the Public Domain (or CC0 licensed, at your option.)
-Unless required by applicable law or agreed to in writing, this
-software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-CONDITIONS OF ANY KIND, either express or implied.*
+I am using a [CAN32](https://www.tindie.com/products/fusion/can32-an-esp32-dev-board-with-can-bus-v21/) for my implementation.

@@ -2,13 +2,14 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include "can.h"
 
 void app_main(void)
 {
-    int i = 0;
+    //setup RTC
+    //setup SD card
+    //setup CAN interface
     while (1) {
-        printf("[%d] Hello world!\n", i);
-        i++;
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+
     }
 }
