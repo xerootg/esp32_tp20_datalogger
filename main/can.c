@@ -138,7 +138,7 @@ void CAN_SetFilter0(uint32_t id){
         return;
     }
 
-    printf("Driver filter sucessfully set\n")
+    printf("Driver filter sucessfully set\n");
 }
 
 void CAN_ResetFilter0(){
