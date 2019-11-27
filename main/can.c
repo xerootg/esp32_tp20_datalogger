@@ -92,7 +92,7 @@ uint8_t CAN_SendMsg(CanMessage_t * msg){
     return 1;
 }
 
-// Return the number of pending received frames
+// Return the number of pending received messages - i.e. how many messages are in the CAN RX FIFO?
 uint8_t CAN_MessagePending(){
     can_status_info_t status;
     esp_err_t err = can_get_status_info(&status);

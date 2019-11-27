@@ -1,3 +1,7 @@
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include <string.h>
+
 #include "can.h"
 #include "vwtp.h"
 #include "config.h"
@@ -11,15 +15,21 @@ uint8_t ecuT1, ecuT3;
 
 volatile uint16_t timerVWTP = 0;
 
-#define CAN_RX_TIMEOUT 500 //maximum time for receiving message from ecu
-#define CAN_RX_GATEWAY_TIMEOUT 1000 //maximum time for receiving message from gateway
+#define CAN_RX_TIMEOUT 500 //maximum time (ms) for receiving message from ecu
+#define CAN_RX_GATEWAY_TIMEOUT 1000 //maximum time (ms) for receiving message from gateway
+
+const TickType_t oneMs = 1 / portTICK_PERIOD_MS;
+
+void timerVWTPTick(){
+  timerVWTP--;
+  vTaskDelay(oneMs);
+}
 
 // VWTP_OK
 VWTP_Result_t VWTP_Connect()
 {
   CanMessage_t msg;
   uint8_t i = 0;
-  uint8_t extId;
   CanMessage_t VWTPInitMsg = {0x200, 7, {0x01, 0xC0, 0x00, 0x10, 0x00, 0x03, 0x01}};
   CanMessage_t VWTPTimingMsg = {0, 6, {0xA0, 0x0F, 0x8A, 0xFF, 0x32, 0xFF}};
   
@@ -35,15 +45,21 @@ VWTP_Result_t VWTP_Connect()
   }
 
   timerVWTP = CAN_RX_GATEWAY_TIMEOUT;
-  while (!CAN_MessagePending() && timerVWTP);
-  if (!timerVWTP)
+
+  //Tick the clock until theres a message
+  while (!CAN_MessagePending() && timerVWTP){
+    timerVWTPTick();
+  };
+
+  // if the timer is empty, 
+  if (!timerVWTP) // if timerVWTP == 0
   {
     return VWTP_CAN_RX_TIMEOUT;
   }
 
   if ( (msg.id == 0x201) && 
        (msg.len == 7) &&
-       ((msg.payload[3]<<8) | msg.payload[2] == testerId) &&
+       (((msg.payload[3]<<8) | msg.payload[2]) == testerId) &&
        (msg.payload[1] == 0xD0) ) //positive response
   {
     ecuId = (msg.payload[5]<<8) | msg.payload[4]; //address where you need to send messages to ecu
@@ -57,7 +73,9 @@ VWTP_Result_t VWTP_Connect()
   msg.id = ecuId;
   
   timerVWTP = delayT3;
-  while (timerVWTP);
+  while (timerVWTP){
+    timerVWTPTick();
+  };
 
   if (!CAN_SendMsg(&msg))
   {
@@ -69,18 +87,15 @@ VWTP_Result_t VWTP_Connect()
   do //protection if there were still frames with a different id than testerId in the fifo
   {
     timerVWTP = CAN_RX_GATEWAY_TIMEOUT;
-    while (!CAN_MessagePending() && timerVWTP);
+    while (!CAN_MessagePending() && timerVWTP){
+      timerVWTPTick();
+    };
     if (!timerVWTP)
     {
       return VWTP_CAN_RX_TIMEOUT;
     }
 
-    extId = CAN_ReceiveMsg(&msg);
-    if (extId)
-    {
-      CAN_UseExtId();
-    }
-    //add timeout support
+    CAN_ReceiveMsg(&msg);
   } while ((msg.id != testerId) && --i);
   
   if (0 == i)
@@ -110,7 +125,9 @@ VWTP_Result_t VWTP_Disconnect()
   msg.payload[0] = 0xA8; //disconnect
 
   timerVWTP = delayT3;
-  while (timerVWTP);
+  while (timerVWTP){
+    timerVWTPTick();
+  };
 
   if (!CAN_SendMsg(&msg))
   {
@@ -131,7 +148,9 @@ VWTP_Result_t VWTP_ACK()
   msg.payload[0] = 0xA3; //connection test
 
   timerVWTP = delayT3;
-  while (timerVWTP);
+  while (timerVWTP){
+    timerVWTPTick();
+  };
 
   if (!CAN_SendMsg(&msg))
   {
@@ -139,7 +158,9 @@ VWTP_Result_t VWTP_ACK()
   }
   
   timerVWTP = CAN_RX_TIMEOUT;
-  while (!CAN_MessagePending() && timerVWTP);
+  while (!CAN_MessagePending() && timerVWTP){
+    timerVWTPTick();
+  };
   if (!timerVWTP)
   {
     return VWTP_CAN_RX_TIMEOUT;
@@ -174,7 +195,7 @@ VWTP_Result_t VWTP_KWP2000Message(uint8_t SID, uint8_t parameter, uint8_t * kwpM
 {
   VWTP_Result_t errorCode = VWTP_OK;
   VWTP_State_t state = SEND_REQUEST;
-  uint8_t frameNumber;
+  uint8_t frameNumber = -1;
   CanMessage_t msg;
   uint8_t * buf_p = kwpMessage + 1;
   uint8_t i;
@@ -209,7 +230,9 @@ VWTP_Result_t VWTP_KWP2000Message(uint8_t SID, uint8_t parameter, uint8_t * kwpM
         kwpMessage[0] = 0;
 
         timerVWTP = delayT3;
-        while (timerVWTP);
+        while (timerVWTP){
+          timerVWTPTick();
+        };
         
         if (!CAN_SendMsg(&msg))
         {
@@ -222,7 +245,9 @@ VWTP_Result_t VWTP_KWP2000Message(uint8_t SID, uint8_t parameter, uint8_t * kwpM
     
       case RECEIVE_ACK:
         timerVWTP = CAN_RX_TIMEOUT;
-        while (!CAN_MessagePending() && timerVWTP);
+        while (!CAN_MessagePending() && timerVWTP){
+          timerVWTPTick();
+        };
         if (!timerVWTP)
         {
           errorCode = VWTP_CAN_RX_TIMEOUT;
@@ -242,7 +267,9 @@ VWTP_Result_t VWTP_KWP2000Message(uint8_t SID, uint8_t parameter, uint8_t * kwpM
         
       case RECEIVE_FIRST_MSG:
         timerVWTP = CAN_RX_TIMEOUT;
-        while (!CAN_MessagePending() && timerVWTP);
+        while (!CAN_MessagePending() && timerVWTP){
+          timerVWTPTick();
+        };
         if (!timerVWTP)
         {
           errorCode = VWTP_CAN_RX_TIMEOUT;
@@ -286,7 +313,9 @@ VWTP_Result_t VWTP_KWP2000Message(uint8_t SID, uint8_t parameter, uint8_t * kwpM
         
       case RECEIVE_NEXT_MSG:
         timerVWTP = CAN_RX_TIMEOUT;
-        while (!CAN_MessagePending() && timerVWTP);
+        while (!CAN_MessagePending() && timerVWTP){
+          timerVWTPTick();
+        };
         if (!timerVWTP)
         {
           errorCode = VWTP_CAN_RX_TIMEOUT;
@@ -325,7 +354,9 @@ VWTP_Result_t VWTP_KWP2000Message(uint8_t SID, uint8_t parameter, uint8_t * kwpM
         msg.payload[0] = 0xB0 | frameNumber;
 
         timerVWTP = delayT3;
-        while (timerVWTP);
+        while (timerVWTP){
+          timerVWTPTick();
+        };
         
         if (!CAN_SendMsg(&msg))
         {
@@ -341,7 +372,9 @@ VWTP_Result_t VWTP_KWP2000Message(uint8_t SID, uint8_t parameter, uint8_t * kwpM
         msg.payload[0] = 0xB0 | frameNumber;
 
         timerVWTP = delayT3;
-        while (timerVWTP);
+        while (timerVWTP){
+          timerVWTPTick();
+        };
         
         if (!CAN_SendMsg(&msg))
         {
@@ -350,6 +383,8 @@ VWTP_Result_t VWTP_KWP2000Message(uint8_t SID, uint8_t parameter, uint8_t * kwpM
         }
       
         state = RECEIVE_FIRST_MSG;
+        break;
+      case FINISHED: //making the compiler happy. This should never happen, since we WHILE NOT FINISHED above this switch :(
         break;
     }
   }

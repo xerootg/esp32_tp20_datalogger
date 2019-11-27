@@ -1,11 +1,17 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "diag.h"
+#include "file_operations.h"
 #include "vwtp.h"
+#include "can.h"
 #include "config.h"
 
 extern volatile uint16_t timeSec;
 extern volatile uint8_t time10MSec;
 
-uint8_t Byte2HexStr(uint8_t * s, uint8_t val)
+uint8_t Byte2HexStr(char * s, uint8_t val)
 {
   const char * hexArray = "0123456789abcdef";
   s[0] = hexArray[val/16];
@@ -14,10 +20,9 @@ uint8_t Byte2HexStr(uint8_t * s, uint8_t val)
 }
 
 
-uint8_t DecodeUnits(uint8_t *q, uint8_t *frameData)
+uint8_t DecodeUnits(char *p, uint8_t *frameData)
 {
-  char * p = (char *)q;
-  uint8_t *p_saved = q;
+  char * p_saved = p;
   int i;
   uint8_t len;
   
@@ -188,13 +193,14 @@ uint8_t DecodeUnits(uint8_t *q, uint8_t *frameData)
 }
 
 
-uint8_t DecodeFrame(uint8_t *p, uint8_t *frameData)
+uint8_t DecodeFrame(char *p, uint8_t *frameData)
 {
+  char * p_saved = p;
+
   uint16_t val_u16;
   int16_t val_s16;
   float f;
   int i, j, len;
-  uint8_t *p_saved = p;
   
   for (i=0; i<12; i+=3)
   {
@@ -628,21 +634,6 @@ uint8_t DecodeFrame(uint8_t *p, uint8_t *frameData)
   return len;
 }
 
-void DebugKWP2000Frame(uint8_t * kwp)
-{
-  uint8_t debugString[256];
-  uint8_t *p = debugString;
-  uint8_t i;
-
-  p += sprintf(p, "KWP2000 msg, len=%d, ", kwp[0]);
-  for (i=1; i<=kwp[0]; i++)
-  {
-    p += sprintf(p, "%02x ", kwp[i]);
-  }
-  p += sprintf(p, "\n");
-  printf(debugString);
-}
-
 // return 0 - terminated by user
 // return 1 - vwtp error
 // return 2 - filesystem error
@@ -651,18 +642,18 @@ uint8_t vwtp(uint8_t *config, FILE *log_file, uint8_t vwtpDebug)
 {
   uint8_t groupNumber = config[1];
   uint8_t groupPos = 1;
-  uint8_t currentLogLine[150];
-  uint8_t *currentLogLine_p = currentLogLine;
-  uint8_t errorCode;
+  char currentLogLine[150];
+  char *currentLogLine_p = currentLogLine;
+  uint8_t errorCode = 1; //default to vwtp error
   uint8_t kwp[128];
   VWTP_Result_t result;
 
   
-  uint8_t units_buf[150];
-  uint8_t *units_buf_p = units_buf;
+  char units_buf[150];
+  char *units_buf_p = units_buf;
   
-  uint8_t file_header[120];
-  uint8_t *file_header_p = file_header;
+  char file_header[120];
+  char *file_header_p = file_header;
   uint8_t i, j;
   
   CAN_FlushReceiveFifo();
@@ -681,11 +672,6 @@ uint8_t vwtp(uint8_t *config, FILE *log_file, uint8_t vwtpDebug)
   {
     return 12;
   }
-  
-  if (vwtpDebug)
-  {
-    DebugKWP2000Frame(kwp);
-
 
   if ( (kwp[0] != 4) || (kwp[2] != 2) || (kwp[3] != 0x50) || (kwp[4] != 0x89) )
   {
@@ -705,11 +691,6 @@ uint8_t vwtp(uint8_t *config, FILE *log_file, uint8_t vwtpDebug)
   if (result != VWTP_OK)
   {
     return 15;
-  }
-  
-  if (vwtpDebug)
-  {
-    DebugKWP2000Frame(kwp);
   }
 
   if ((kwp[3] == 0x5A) && (kwp[4] == 0x9B) )
@@ -738,11 +719,6 @@ uint8_t vwtp(uint8_t *config, FILE *log_file, uint8_t vwtpDebug)
   if (result != VWTP_OK)
   {
     return 17;
-  }
-  
-  if (vwtpDebug)
-  {
-    DebugKWP2000Frame(kwp);
   }
 
   if ( (kwp[3] != 0x71) || (kwp[4] != 0xB8) )
@@ -781,11 +757,6 @@ uint8_t vwtp(uint8_t *config, FILE *log_file, uint8_t vwtpDebug)
     {
       errorCode = 20;
       break;
-    }
-
-    if (vwtpDebug)
-    {
-      DebugKWP2000Frame(kwp);
     }
     
     if ( (kwp[3] == 0x61) && (kwp[4] == groupNumber) ) //group response
