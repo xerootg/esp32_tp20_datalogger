@@ -59,21 +59,21 @@ void CAN_Close()
     }
 }
 
-// ESP32 does not care about extended frame messages.
-uint8_t CAN_ReceiveMsg(CanMessage_t * msg){
+// For recieving a message. Blocks for up to {timeout} ms. 0 for failure, 1 for success.
+uint8_t CAN_ReceiveMsg(CanMessage_t * msg, int timeout){
     can_message_t _msg;
     printf("%s:%d dequeueing message\n", __FILE__, __LINE__);
-    esp_err_t err = can_receive(&_msg, portTICK_PERIOD_MS*10);
+    esp_err_t err = can_receive(&_msg, portTICK_PERIOD_MS * timeout);
     printf("%s:%d dequeued message sucessfully\n", __FILE__, __LINE__);
     if(err == ESP_OK){
         msg->id = _msg.identifier;
         msg->len = _msg.data_length_code;
         memmove(msg->payload, _msg.data, 8);
         printf("%s:%d successfully got the message\n", __FILE__, __LINE__);
-        return 0; //sucessful message RX
+        return 1; //sucessful message RX
     }
     printf("%s:%d FAILED: fetching message\n", __FILE__, __LINE__);
-    return 1; //something terrible happened
+    return 0; //something terrible happened
 }
 
 // TODO: understand error codes for this one - 255 appears to be sucess and 0 failure.
@@ -87,23 +87,12 @@ uint8_t CAN_SendMsg(CanMessage_t * msg){
     if(err == ESP_OK){
         err = can_clear_transmit_queue();
         if(err == ESP_OK){
-            // printf("%s:%d message sent\n", __FILE__, __LINE__);
+            printf("%s:%d message sent\n", __FILE__, __LINE__);
             return 1;
         }
     }
-    // printf("%s:%d FAILED: message sent\n", __FILE__, __LINE__);
+    printf("%s:%d FAILED: message sent\n", __FILE__, __LINE__);
     return 0;
-}
-
-// Return the number of pending received messages - i.e. how many messages are in the CAN RX FIFO?
-uint8_t CAN_MessagePending(){
-    can_status_info_t status;
-    esp_err_t err = can_get_status_info(&status);
-    if(err){
-        printf("Failed to get CAN status");
-        return 1;
-    }
-    return status.msgs_to_rx;
 }
 
 //sets inbox filter to only accept "id"
