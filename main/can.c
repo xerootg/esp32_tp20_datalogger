@@ -7,7 +7,7 @@
 void CAN_Open()
 {
     //Initialize configuration structures using macro initializers
-    can_general_config_t g_config = CAN_GENERAL_CONFIG_DEFAULT(GPIO_NUM_21, GPIO_NUM_22, CAN_MODE_NORMAL);
+    can_general_config_t g_config = CAN_GENERAL_CONFIG_DEFAULT(GPIO_NUM_26, GPIO_NUM_32, CAN_MODE_NORMAL);
     can_timing_config_t t_config = CAN_TIMING_CONFIG_500KBITS();
     can_filter_config_t f_config = CAN_FILTER_CONFIG_ACCEPT_ALL();
 
@@ -39,22 +39,22 @@ void CAN_Close()
     //Stop the CAN driver
     if (can_stop() == ESP_OK)
     {
-        printf("Driver stopped\n");
+        // printf("%s:%d driver stopped\n", __FILE__, __LINE__);
     }
     else
     {
-        printf("Failed to stop driver\n");
+        // printf("%s:%d FAILED: driver stopped\n", __FILE__, __LINE__);
         return;
     }
 
     //Uninstall the CAN driver
     if (can_driver_uninstall() == ESP_OK)
     {
-        printf("Driver uninstalled\n");
+        // printf("%s:%d driver uninstalled\n", __FILE__, __LINE__);
     }
     else
     {
-        printf("Failed to uninstall driver\n");
+        // printf("%s:%d FAILED: driver uninstalled\n", __FILE__, __LINE__);
         return;
     }
 }
@@ -62,16 +62,17 @@ void CAN_Close()
 // ESP32 does not care about extended frame messages.
 uint8_t CAN_ReceiveMsg(CanMessage_t * msg){
     can_message_t _msg;
-
-    esp_err_t err = can_receive(&_msg, portMAX_DELAY);
-
+    printf("%s:%d dequeueing message\n", __FILE__, __LINE__);
+    esp_err_t err = can_receive(&_msg, portTICK_PERIOD_MS*10);
+    printf("%s:%d dequeued message sucessfully\n", __FILE__, __LINE__);
     if(err == ESP_OK){
         msg->id = _msg.identifier;
         msg->len = _msg.data_length_code;
         memmove(msg->payload, _msg.data, 8);
-
+        printf("%s:%d successfully got the message\n", __FILE__, __LINE__);
         return 0; //sucessful message RX
     }
+    printf("%s:%d FAILED: fetching message\n", __FILE__, __LINE__);
     return 1; //something terrible happened
 }
 
@@ -86,10 +87,12 @@ uint8_t CAN_SendMsg(CanMessage_t * msg){
     if(err == ESP_OK){
         err = can_clear_transmit_queue();
         if(err == ESP_OK){
-            return 0;
+            // printf("%s:%d message sent\n", __FILE__, __LINE__);
+            return 1;
         }
     }
-    return 1;
+    // printf("%s:%d FAILED: message sent\n", __FILE__, __LINE__);
+    return 0;
 }
 
 // Return the number of pending received messages - i.e. how many messages are in the CAN RX FIFO?
@@ -100,64 +103,64 @@ uint8_t CAN_MessagePending(){
         printf("Failed to get CAN status");
         return 1;
     }
-    return status.msgs_to_tx;
+    return status.msgs_to_rx;
 }
 
 //sets inbox filter to only accept "id"
 void CAN_SetFilter0(uint32_t id){
-    can_filter_config_t f_config = CAN_FILTER_CONFIG_ACCEPT_ALL();
-    f_config.single_filter = true;
-    f_config.acceptance_mask = id; //TODO: theres some magic here. Make sure the mask is a simple AND.
-
+    // printf("%s:%d setting filter to %3x\n", __FILE__, __LINE__, id);
+    can_filter_config_t f_config = {.acceptance_code = (id << 21),
+                                    .acceptance_mask = ~(CAN_STD_ID_MASK << 21),
+                                    .single_filter = true};
     CAN_Close();
 
     //Initialize configuration structures using macro initializers
-    can_general_config_t g_config = CAN_GENERAL_CONFIG_DEFAULT(GPIO_NUM_21, GPIO_NUM_22, CAN_MODE_NORMAL);
+    can_general_config_t g_config = CAN_GENERAL_CONFIG_DEFAULT(GPIO_NUM_26, GPIO_NUM_32, CAN_MODE_NORMAL);
     can_timing_config_t t_config = CAN_TIMING_CONFIG_500KBITS();
 
+    // printf("%s:%d installing filter\n", __FILE__, __LINE__);
     //Install CAN driver
-    printf("Setting filter by reinstalling and starting the driver\n");
     if (can_driver_install(&g_config, &t_config, &f_config) == ESP_OK)
     {
-        printf("Driver reinstalled\n");
+        // printf("%s:%d filter installed\n", __FILE__, __LINE__);
     }
     else
     {
-        printf("Failed to reinstall driver\n");
+        // printf("%s:%d FAILED: installing filter\n", __FILE__, __LINE__);
         return;
     }
 
     //Start CAN driver
     if (can_start() == ESP_OK)
     {
-        printf("Driver restarted\n");
+        // printf("%s:%d driver started\n", __FILE__, __LINE__);
     }
     else
     {
-        printf("Failed to restart driver\n");
+        // printf("%s:%d FAILED: driver started\n", __FILE__, __LINE__);
         return;
     }
 
-    printf("Driver filter sucessfully set\n");
+    // printf("%s:%d sucessfully installed filter\n", __FILE__, __LINE__);
 }
 
 void CAN_ResetFilter0(){
-    printf("Resetting Filter\n");
-    CAN_Close();
-    CAN_Open();
-    printf("Filter Reset\n");
+    // printf("%s:%d resetting filter\n", __FILE__, __LINE__);
+    CAN_SetFilter0(0x201);
+    CAN_FlushReceiveFifo();
+    //printf("%s:%d filter reset\n", __FILE__, __LINE__);
 }
 
 void CAN_FlushReceiveFifo(){
     esp_err_t err = can_clear_receive_queue();
     if(err == ESP_OK){
-        printf("Sucessfully cleared the RX queue\n");
+        // printf("%s:%d cleared RX queue\n", __FILE__, __LINE__);
         return;
     }
     if(err == ESP_ERR_INVALID_STATE){
-        printf("CAN driver is not installed\n");
+        // printf("%s:%d CAN driver is not installed\n", __FILE__, __LINE__);
     }
-    printf("Failed to clear RX queue\n");
+    // printf("%s:%d Failed to clear RX queue\n", __FILE__, __LINE__);
 };
 
 //not implementing

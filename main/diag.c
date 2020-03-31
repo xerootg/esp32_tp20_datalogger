@@ -638,7 +638,7 @@ uint8_t DecodeFrame(char *p, uint8_t *frameData)
 // return 1 - vwtp error
 // return 2 - filesystem error
 
-uint8_t vwtp(uint8_t *config, FILE *log_file, uint8_t vwtpDebug) 
+uint8_t vwtp(char *config, FILE *log_file, uint8_t vwtpDebug) 
 {
   uint8_t groupNumber = config[1];
   uint8_t groupPos = 1;

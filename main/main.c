@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -8,7 +9,7 @@
 
 volatile uint16_t timeSec = 0;
 volatile uint8_t time10MSec = 0;
-uint8_t config[3][4];
+char config[3][4];
 
 void app_main()
 {
@@ -18,6 +19,7 @@ void app_main()
     //setup CAN interface
     CAN_Open();
     while (1) {
-        vwtp(&config[0], outfile, false);
+        uint8_t exit = vwtp(config[0], outfile, false);
+        printf("VWTP exited with %d\n", exit);
     }
 }

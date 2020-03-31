@@ -7,7 +7,7 @@
 #include "config.h"
 
 uint16_t testerId = 0x300;
-uint16_t ecuId = 0;
+uint16_t ecuId = 1;
 uint8_t nextSN = 0;
 uint16_t delayT3 = 12;  //intermessage delay
 
@@ -37,15 +37,18 @@ VWTP_Result_t VWTP_Connect()
   testerId = 0x300;
   ecuId = 0x000;
   
+  printf("%s:%d resetting filter\n", __FILE__, __LINE__);
   CAN_ResetFilter0();
 
   if (!CAN_SendMsg(&VWTPInitMsg))
   {
+    printf("%s:%d failed to send message\n", __FILE__, __LINE__);
     return VWTP_CAN_TX_ERROR; // cannot send msg
   }
+  printf("%s:%d message sent\n", __FILE__, __LINE__);
 
   timerVWTP = CAN_RX_GATEWAY_TIMEOUT;
-
+  printf("%s:%d waiting for can response\n", __FILE__, __LINE__);
   //Tick the clock until theres a message
   while (!CAN_MessagePending() && timerVWTP){
     timerVWTPTick();
@@ -54,8 +57,16 @@ VWTP_Result_t VWTP_Connect()
   // if the timer is empty, 
   if (!timerVWTP) // if timerVWTP == 0
   {
+    printf("%s:%d timeout \n", __FILE__, __LINE__);
     return VWTP_CAN_RX_TIMEOUT;
   }
+
+  if(CAN_ReceiveMsg(&msg))
+  {
+    printf("%s:%d Failed to fetch message \n", __FILE__, __LINE__);
+  }
+
+  printf("%s:%d Got a message \n", __FILE__, __LINE__);
 
   if ( (msg.id == 0x201) && 
        (msg.len == 7) &&
@@ -66,8 +77,10 @@ VWTP_Result_t VWTP_Connect()
   }
   else
   {
+    printf("%s:%d Bad VWTP packet - ID:%03x\n",  __FILE__, __LINE__, msg.id);
     return VWTP_FRAME_ERROR;
   }
+  printf("%s:%d destination address: %d - \n", __FILE__, __LINE__, ecuId);
   
   memmove(&msg, &VWTPTimingMsg, sizeof(VWTPTimingMsg));
   msg.id = ecuId;
