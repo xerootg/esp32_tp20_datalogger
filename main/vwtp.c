@@ -1,6 +1,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>
+#include "file_operations.h"
 
 #include "can.h"
 #include "vwtp.h"
@@ -68,15 +69,16 @@ VWTP_Result_t VWTP_Connect()
     printf("%s:%d Bad VWTP packet - ID:%03x\n",  __FILE__, __LINE__, msg.id);
     return VWTP_FRAME_ERROR;
   }
-  printf("%s:%d destination address: %d - \n", __FILE__, __LINE__, ecuId);
+  printf("%s:%d destination address: %x - \n", __FILE__, __LINE__, ecuId);
   
   memmove(&msg, &VWTPTimingMsg, sizeof(VWTPTimingMsg));
   msg.id = ecuId;
   
-  timerVWTP = delayT3;
+  /*timerVWTP = delayT3;
   while (timerVWTP){
     timerVWTPTick();
-  };
+  };*/
+  vTaskDelay(delayT3 / portTICK_PERIOD_MS);
 
   if (!CAN_SendMsg(&msg))
   {
@@ -195,6 +197,7 @@ VWTP_Result_t VWTP_KWP2000Message(uint8_t SID, uint8_t parameter, uint8_t * kwpM
 
   if (kwpMessage[0] > 3)
   {
+    printf("%s:%d frame too long error\n", __FILE__, __LINE__);
     return VWTP_TX_MSG_TOO_LONG;
   }
 
@@ -202,6 +205,7 @@ VWTP_Result_t VWTP_KWP2000Message(uint8_t SID, uint8_t parameter, uint8_t * kwpM
   {
     if ((buf_p-kwpMessage) > MAXIMUM_MESSAGE_LENGTH)
     {
+      printf("%s:%d frame too long error\n", __FILE__, __LINE__);
       errorCode = VWTP_MSG_TOO_LONG;
       break;
     }
@@ -250,6 +254,7 @@ VWTP_Result_t VWTP_KWP2000Message(uint8_t SID, uint8_t parameter, uint8_t * kwpM
         else
         {
           errorCode = VWTP_FRAME_ERROR;
+          printf("%s:%d frame error\n", __FILE__, __LINE__);
           break;
         }
         break;
@@ -271,6 +276,7 @@ VWTP_Result_t VWTP_KWP2000Message(uint8_t SID, uint8_t parameter, uint8_t * kwpM
                (msg.payload[5] == 0x78) )
           {
             state = REQUEST_PENDING_RECEIVED_SEND_ACK;
+            //printf("%s:%d response pending\n", __FILE__, __LINE__);
           }
           else 
           {
@@ -291,13 +297,14 @@ VWTP_Result_t VWTP_KWP2000Message(uint8_t SID, uint8_t parameter, uint8_t * kwpM
         }
         else
         {
+          printf("%s:%d frame error\n", __FILE__, __LINE__);
           errorCode = VWTP_FRAME_ERROR;
           break;
         }
         break;
         
       case RECEIVE_NEXT_MSG:
-        if (CAN_ReceiveMsg(&msg, CAN_RX_TIMEOUT))
+        if (!CAN_ReceiveMsg(&msg, CAN_RX_TIMEOUT))
         {
           errorCode = VWTP_CAN_RX_TIMEOUT;
           break;
@@ -311,6 +318,7 @@ VWTP_Result_t VWTP_KWP2000Message(uint8_t SID, uint8_t parameter, uint8_t * kwpM
           buf_p += msg.len-1;
           frameNumber = (frameNumber + 1) & 0x0F;
           state = LAST_MSG_RECEIVED_SEND_ACK;
+          //printf("%s:%d got last frame #%d\n", __FILE__, __LINE__,frameNumber);
         }
         else if ( ((msg.payload[0] & 0xF0) == 0x20) &&
                   ((msg.payload[0] & 0x0F) == frameNumber) )
@@ -320,10 +328,12 @@ VWTP_Result_t VWTP_KWP2000Message(uint8_t SID, uint8_t parameter, uint8_t * kwpM
           kwpMessage[0] += msg.len - 1;
           buf_p += msg.len-1;
           state = RECEIVE_NEXT_MSG;
+          //printf("%s:%d got frame #%d\n", __FILE__, __LINE__,frameNumber);
         }
         else
         {
           errorCode = VWTP_FRAME_ERROR;
+          printf("%s:%d frame error at #%d\n", __FILE__, __LINE__,frameNumber);
           break;
         }
         break;
