@@ -690,6 +690,7 @@ uint8_t vwtp(char *config, FILE *log_file, uint8_t vwtpDebug)
   result =  VWTP_KWP2000Message(0x1A, 0x9B, kwp);
   if (result != VWTP_OK)
   {
+    printf("%s:%d ERROR: %d\n", __FILE__, __LINE__,result);
     return 15;
   }
 
